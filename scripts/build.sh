@@ -10,7 +10,7 @@ ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 export NUGET_HTTP_CACHE_PATH="${NUGET_HTTP_CACHE_PATH:-/tmp/nuget-cache}"
 export NUGET_PACKAGES="${NUGET_PACKAGES:-/tmp/nuget-packages}"
 
-PROJECT_PATH="$ROOT_DIR/CodeEditor/CodeEditor.csproj"
+PROJECT_PATH="$ROOT_DIR/src/CodeEditor/CodeEditor.csproj"
 CONFIG="Debug"
 
 # Parse arguments
