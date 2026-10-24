@@ -1,0 +1,42 @@
+# Build results
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+bld/
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+
+# NuGet
+nuget.config.local
+packages/
+*.nupkg
+# The packages folder can be ignored to allow building without caching,
+# but add it here for projects that use it as a source.
+!packages/.gitkeep
+
+# User-specific editor files
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# VS/RS cache
+.vs/
+.vscode/
+*.csproj.user.local.xml
+
+# Build output from Terminal.Gui local clone (if used)
+cloned/Terminal.Gui/Terminal.Gui/bin/
+cloned/Terminal.Gui/Terminal.Gui/obj/
+
+# Serilog log files
+logs/*.log
+
+# OS files
+.DS_Store
+Thumbs.db
