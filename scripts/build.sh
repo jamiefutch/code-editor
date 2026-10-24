@@ -42,5 +42,6 @@ echo "Config:   $CONFIG"
 echo "NuGet pkg: $NUGET_PACKAGES"
 echo ""
 
+dotnet clean "$PROJECT_PATH" -c "$CONFIG" --nologo && \
 dotnet restore "$PROJECT_PATH" && \
 dotnet build "$PROJECT_PATH" -c "$CONFIG"

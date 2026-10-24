@@ -20,7 +20,7 @@ public sealed partial class CodeEditorApp
         EditorConfig.ConvertTabsToSpaces = Editor.ConvertTabsToSpaces;
         EditorConfig.AutoIndent = Editor.IndentationStrategy is not null;
         EditorConfig.Scrollbars = Editor.ViewportSettings.HasFlag(ViewportSettingsFlags.HasScrollBars);
-        EditorConfig.VirtualSpace = true; // Always enabled when configured
+        EditorConfig.VirtualSpace = Editor.VirtualSpaceEnabled;
 
         EditorConfig.Save();
     }
@@ -31,12 +31,14 @@ public sealed partial class CodeEditorApp
         Editor.GutterOptions = has
             ? Editor.GutterOptions ^ GutterOptions.LineNumbers
             : Editor.GutterOptions | GutterOptions.LineNumbers;
+        UpdateViewMenus();
         SaveViewSettings();
     }
 
     private void ToggleWordWrap()
     {
         Editor.WordWrap = !Editor.WordWrap;
+        UpdateViewMenus();
         SaveViewSettings();
     }
 
@@ -46,6 +48,7 @@ public sealed partial class CodeEditorApp
         Editor.GutterOptions = has
             ? Editor.GutterOptions ^ GutterOptions.Folding
             : Editor.GutterOptions | GutterOptions.Folding;
+        UpdateViewMenus();
         SaveViewSettings();
     }
 
@@ -59,12 +62,14 @@ public sealed partial class CodeEditorApp
         {
             Editor.IndentationStrategy = new DefaultIndentationStrategy();
         }
+        UpdateViewMenus();
         SaveViewSettings();
     }
 
     private void ToggleShowTabs()
     {
         Editor.ShowTabs = !Editor.ShowTabs;
+        UpdateViewMenus();
         SaveViewSettings();
     }
 
@@ -74,15 +79,15 @@ public sealed partial class CodeEditorApp
         Editor.ViewportSettings = has
             ? ViewportSettingsFlags.None
             : ViewportSettingsFlags.HasScrollBars;
+        UpdateViewMenus();
         SaveViewSettings();
     }
 
     private void ToggleVirtualSpace()
     {
-        // Virtual space is always enabled via EnableVirtualSpace().
-        // This toggle just confirms the setting in the status bar.
-        EditorConfig.VirtualSpace = true;
-        EditorConfig.Save();
+        Editor.VirtualSpaceEnabled = !Editor.VirtualSpaceEnabled;
+        UpdateViewMenus();
+        SaveViewSettings();
     }
 
     private void ShowAboutDialog()

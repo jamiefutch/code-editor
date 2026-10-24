@@ -145,7 +145,6 @@ public sealed partial class CodeEditorApp
         catch (Exception ex) when (IsFileOperationException(ex)) { return false; }
 
         CurrentFilePath = filePath;
-        UpdateFileNameShortcut();
         return true;
     }
 
@@ -249,7 +248,6 @@ public sealed partial class CodeEditorApp
 
         Editor.HighlightingDefinition = def;
         LanguageShortcut.Title = def?.Name ?? "Plain Text";
-        UpdateFileNameShortcut();
         Editor.SetNeedsDraw();
     }
 

@@ -1,0 +1,11 @@
+Fix the CodeEditor so Virtual Space appears in the View menu. The current build compiles but the toggle is invisible — it was added as a raw CheckBox to SubMenu instead of using the MenuItem+CommandView pattern that EditorMenuBar uses for all other View toggles (Line Numbers, Fold Indicators, Word Wrap, Show Tabs, Scrollbars).
+
+The bar is the running CodeEditor app at /Users/jamiefutch/projects/personal/editor. Screenshot it and verify Virtual Space shows as a checkbox item in the View menu alongside the existing five toggles. The toggle must be functional — clicking it enables/disables virtual space (cursor moving beyond EOL on Right/Down arrows), and the setting persists to ~/.tui/codeeditor.config.json.
+
+Break this into pieces: 1) Verify the MenuItem+CommandView pattern renders correctly when added to Menu.ViewMenu.SubMenu, 2) Verify the CheckBox state updates when toggled, 3) Verify VirtualSpaceEnabled property on VirtualSpaceEditor actually disables/enables the OnKeyDown intercept, 4) Verify persistence round-trips through EditorConfig.Save and Load.
+
+For each piece, fan out a builder and a separate critic with fresh context. The critic runs dotnet build, launches the app, opens View menu, checks for Virtual Space visibility and functionality, compares against the screenshot of what it should look like blind, names which is correct, and identifies the single biggest remaining gap. If ours does not work, it goes back to the builder.
+
+The critic should be a harsh critic. Praise is not useful. If ours does not win, it keeps going.
+
+Keep looping until the critic confirms Virtual Space is visible in the View menu and functional. Run the builders and critics as parallel subagents.

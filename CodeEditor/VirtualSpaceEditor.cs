@@ -1,24 +1,30 @@
 using Terminal.Gui.Editor;
-using Terminal.Gui.Editor.Document;
 using Terminal.Gui.Input;
-using Terminal.Gui.ViewBase;
 
 namespace CodeEditor;
 
 /// <summary>
 ///     Editor subclass with Visual Studio-style virtual space support.
-///     Allows cursor to move beyond end-of-line on short lines via Right/Down arrows.
+///     Intercepts Right/Down at the key level so normal editing still works.
 /// </summary>
 public sealed class VirtualSpaceEditor : Editor
 {
-    public VirtualSpaceEditor()
-    {
-        // Replace Command.Right handler to allow moving past EOL into virtual space.
-        AddCommand(Command.Right, VirtualSpaceRight);
+    private bool _enabled = true;
 
-        // Replace Command.Down handler to preserve virtual column across short lines.
-        AddCommand(Command.Down, VirtualSpaceDown);
+    /// <summary>
+    ///     Whether virtual space is enabled. When false, Right/Down behave normally (snap to EOL).
+    /// </summary>
+    public bool VirtualSpaceEnabled
+    {
+        get => _enabled;
+        set
+        {
+            if (_enabled == value) return;
+            _enabled = value;
+        }
     }
+
+    public VirtualSpaceEditor() { }
 
     /// <summary>
     ///     Checks whether the caret is currently in virtual space (beyond end-of-line).
@@ -46,60 +52,60 @@ public sealed class VirtualSpaceEditor : Editor
         return Math.Max(0, logicalColumn - line.Length);
     }
 
-    // ── Virtual space command handlers ────────────────────────────────────────────
+    // ── Key-level intercept for virtual space ─────────────────────────────────────
 
-    private bool? VirtualSpaceRight(ICommandContext? ctx)
+    protected override bool OnKeyDown(Key key)
     {
-        var doc = Document;
-        if (doc is null) return null;
+        if (!_enabled)
+            return base.OnKeyDown(key);
 
-        var line = doc.GetLineByOffset(CaretOffset);
-        var eol = line.Offset + line.Length;
-
-        if (CaretOffset < eol)
+        if (key == Key.CursorRight || key == Key.CursorDown)
         {
-            // Not yet at EOL — fall through to default handler.
-            return null;
+            if (HandleVirtualSpaceKey(key))
+                return true; // Handled.
         }
 
-        // We're at or past EOL — advance into virtual space by one column.
-        CaretOffset = CaretOffset + 1;
-        return true;
+        return base.OnKeyDown(key);
     }
 
-    private bool? VirtualSpaceDown(ICommandContext? ctx)
+    private bool HandleVirtualSpaceKey(Key key)
     {
         var doc = Document;
-        if (doc is null) return null;
+        if (doc is null) return false;
 
-        var currentLine = doc.GetLineByOffset(CaretOffset);
-        var logicalColumn = CaretOffset - currentLine.Offset;
-
-        // Move to the next line (or stay if we're on the last line).
-        var nextLine = currentLine.NextLine;
-        if (nextLine is null)
+        if (key == Key.CursorRight)
         {
-            // Last line — move to end of document.
-            CaretOffset = doc.TextLength;
+            var line = doc.GetLineByOffset(CaretOffset);
+            var eol = line.Offset + line.Length;
+
+            // Only intercept when at or past end-of-line.
+            if (CaretOffset < eol)
+                return false;
+
+            // Advance into virtual space by one column.
+            CaretOffset++;
             return true;
         }
 
-        // Calculate the target offset on the next line, clamped to virtual column.
-        var nextLineStart = nextLine.Offset;
-        int targetOffset;
-
-        if (logicalColumn <= nextLine.Length)
+        if (key == Key.CursorDown)
         {
-            // Next line is long enough — move to that column.
-            targetOffset = nextLineStart + logicalColumn;
-        }
-        else
-        {
-            // Next line is shorter — go into virtual space.
-            targetOffset = nextLineStart + logicalColumn;
+            var currentLine = doc.GetLineByOffset(CaretOffset);
+            var logicalColumn = CaretOffset - currentLine.Offset;
+
+            var nextLine = currentLine.NextLine;
+            if (nextLine is null)
+            {
+                // Last line — move to end of document.
+                CaretOffset = doc.TextLength;
+                return true;
+            }
+
+            // Target offset on next line, preserving virtual column even past EOL.
+            var targetOffset = nextLine.Offset + logicalColumn;
+            CaretOffset = Math.Min(targetOffset, doc.TextLength);
+            return true;
         }
 
-        CaretOffset = Math.Min(targetOffset, doc.TextLength);
-        return true;
+        return false;
     }
 }

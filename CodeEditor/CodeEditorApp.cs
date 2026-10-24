@@ -22,10 +22,17 @@ namespace CodeEditor;
 public sealed partial class CodeEditorApp : Window
 {
     private readonly string _configPath;
-    private readonly Shortcut _fileNameShortcut;
+
+    // View toggle CheckBoxes — stored so UpdateViewMenus can refresh their states.
+    private CheckBox? _lineNumbersCheckBox;
+    private CheckBox? _foldIndicatorsCheckBox;
+    private CheckBox? _wordWrapCheckBox;
+    private CheckBox? _showTabsCheckBox;
+    private CheckBox? _scrollbarsCheckBox;
+    private CheckBox? _virtualSpaceCheckBox;
 
     public VirtualSpaceEditor Editor { get; }
-    public EditorMenuBar Menu { get; }
+    public MenuBar Menu { get; }
     public EditorStatusBar StatusBar { get; }
     public string? CurrentFilePath { get; private set; }
     public bool IsDocumentModified => Editor.Document?.UndoStack.IsOriginalFile == false;
@@ -81,31 +88,8 @@ public sealed partial class CodeEditorApp : Window
         // Indentation strategy.
         Editor.IndentationStrategy = EditorConfig.AutoIndent ? new DefaultIndentationStrategy() : null;
 
-        // ── EditorMenuBar: pre-wired File/Edit/View menus ────────────────────────────
-        Menu = new(Editor)
-        {
-            ShowOpenDialog = () => ShowOpenDialog!(),
-            ShowSaveDialog = () => ShowSaveDialog!()
-        };
-
-        Menu.NewRequested += (_, _) => New();
-        Menu.Opening += (_, e) => { if (!ConfirmSaveChanges()) e.Cancel = true; };
-        Menu.OpenRequested += (_, e) => CurrentLoadTask = OpenFileAsync(e.FilePath, true);
-        Menu.SaveRequested += (_, _) => Save();
-        Menu.SaveAsRequested += (_, e) => { _ = SaveFileAsAsync(e.FilePath, true); };
-        Menu.QuitRequested += (_, _) => Quit();
-        Menu.ViewSettingsChanged += (_, _) => SaveViewSettings();
-
-        // Add Help menu.
-        Menu.Add(new MenuBarItem("_Help", new[] { new MenuItem("_About", "About CodeEditor", ShowAboutDialog) }));
-
-        // File-name shortcut in the status bar area (shown in Menu).
-        _fileNameShortcut = new Shortcut(Key.Empty, "<untitled>", Open)
-        {
-            MouseHighlightStates = MouseState.None,
-            SchemeName = SchemeManager.SchemesToSchemeName(Schemes.Dialog)
-        };
-        Menu.Add(_fileNameShortcut);
+        // ── MenuBar: custom-built with File/Edit/View (6 toggles incl. Virtual Space) + Help ──
+        Menu = BuildMenuBar();
 
         // ── EditorStatusBar: pre-wired indicators ─────────────────────────────────────
         StatusBar = new(Editor);
@@ -129,16 +113,133 @@ public sealed partial class CodeEditorApp : Window
         ShowSaveChangesDialog = ShowDefaultSaveChangesDialog;
     }
 
+    // ── MenuBar construction ───────────────────────────────────────────────────────
+
+    private MenuBar BuildMenuBar()
+    {
+        var menuBar = new MenuBar();
+
+        // ── File menu ────────────────────────────────────────────────────────────────
+        menuBar.Add(new MenuBarItem("_File", new View[]
+        {
+            new MenuItem { Title = Strings.cmdNew, Key = Key.N.WithCtrl, Action = New },
+            new MenuItem { Title = Strings.cmdOpen, Key = Key.O.WithCtrl, Action = Open },
+            new MenuItem { Title = Strings.cmdSave, Key = Key.S.WithCtrl, Action = Save },
+            new MenuItem { Title = "Save _As", Key = Key.S.WithCtrl.WithShift, Action = () => _ = SaveFileAsAsync(null!, true) },
+            new Line(),
+            new MenuItem { Title = Strings.cmdQuit, Key = Key.Esc, Action = Quit }
+        }));
+
+        // ── Edit menu ────────────────────────────────────────────────────────────────
+        menuBar.Add(new MenuBarItem("_Edit", new View[]
+        {
+            new MenuItem { Title = "_Find", Key = Key.F.WithCtrl, Action = () => ShowFindReplaceDialog(false) },
+            new MenuItem { Title = "_Replace...", Key = Key.H.WithCtrl, Action = () => ShowFindReplaceDialog(true) },
+            new Line(),
+            new MenuItem { Title = "_Undo", Key = Key.Z.WithCtrl, Action = () => Editor.InvokeCommand(Command.Undo) },
+            new MenuItem { Title = "_Redo", Key = Key.Y.WithCtrl, Action = () => Editor.InvokeCommand(Command.Redo) },
+            new Line(),
+            new MenuItem { Title = "Cu_t", Key = Key.X.WithCtrl, Action = () => Editor.InvokeCommand(Command.Cut) },
+            new MenuItem { Title = "_Copy", Key = Key.C.WithCtrl, Action = () => Editor.InvokeCommand(Command.Copy) },
+            new MenuItem { Title = "_Paste", Key = Key.V.WithCtrl, Action = () => Editor.InvokeCommand(Command.Paste) },
+            new MenuItem { Title = "Delete", Key = Key.Delete, Action = () => Editor.InvokeCommand(Command.DeleteCharLeft) },
+            new Line(),
+            new MenuItem { Title = "Select _all", Key = Key.A.WithCtrl, Action = () => Editor.InvokeCommand(Command.SelectAll) }
+        }));
+
+        // ── View menu — 6 toggles using the TableEditor CheckBoxMenuItem pattern ─────
+        menuBar.Add(new MenuBarItem("_View", BuildViewMenuItems()));
+
+        // ── Help menu ────────────────────────────────────────────────────────────────
+        menuBar.Add(new MenuBarItem("_Help", new View[] { new MenuItem("_About", "About CodeEditor", ShowAboutDialog) }));
+
+        return menuBar;
+    }
+
+    private View[] BuildViewMenuItems()
+    {
+        _lineNumbersCheckBox = CreateToggleCheckBox(
+            "_Line Numbers", EditorConfig.LineNumbers, ToggleLineNumbers);
+
+        _foldIndicatorsCheckBox = CreateToggleCheckBox(
+            "_Fold Indicators", EditorConfig.FoldIndicators, ToggleFoldIndicators);
+
+        _wordWrapCheckBox = CreateToggleCheckBox(
+            "_Word Wrap", EditorConfig.WordWrap, ToggleWordWrap);
+
+        _showTabsCheckBox = CreateToggleCheckBox(
+            "_Show Tabs", EditorConfig.ShowTabs, ToggleShowTabs);
+
+        _scrollbarsCheckBox = CreateToggleCheckBox(
+            "_Scrollbars", EditorConfig.Scrollbars, ToggleScrollbars);
+
+        _virtualSpaceCheckBox = CreateToggleCheckBox(
+            "_Virtual Space", EditorConfig.VirtualSpace, ToggleVirtualSpace);
+
+        // Return MenuItem wrappers with CommandView — Terminal.Gui needs MenuItems
+        // for the submenu to render and open correctly.
+        return new View[]
+        {
+            (View)new MenuItem { CommandView = _lineNumbersCheckBox },
+            (View)new MenuItem { CommandView = _foldIndicatorsCheckBox },
+            (View)new MenuItem { CommandView = _wordWrapCheckBox },
+            (View)new MenuItem { CommandView = _showTabsCheckBox },
+            (View)new MenuItem { CommandView = _scrollbarsCheckBox },
+            (View)new MenuItem { CommandView = _virtualSpaceCheckBox }
+        };
+    }
+
+    /// <summary>
+    ///     Creates a CheckBox menu item matching the TableEditor / EditorMenuBar pattern.
+    ///     The CheckBox uses Title (not Text) for menu rendering, and Accepting advances
+    ///     its state when clicked in the menu.
+    /// </summary>
+    private static CheckBox CreateToggleCheckBox(string title, bool initialState, Action onToggle)
+    {
+        var checkBox = new CheckBox() { Title = title, Value = initialState ? CheckState.Checked : CheckState.UnChecked };
+
+        // Update persisted state when value changes.
+        checkBox.ValueChanged += (_, _) => onToggle();
+
+        // Advance the check state when the menu item is activated (clicked).
+        checkBox.Accepting += (_, e) =>
+        {
+            checkBox.AdvanceCheckState();
+            e.Handled = true;
+        };
+
+        return checkBox;
+    }
+
+    private void UpdateViewMenus()
+    {
+        if (_lineNumbersCheckBox is not null)
+        {
+            bool has = Editor.GutterOptions.HasFlag(GutterOptions.LineNumbers);
+            _lineNumbersCheckBox.Value = has ? CheckState.Checked : CheckState.UnChecked;
+        }
+        if (_foldIndicatorsCheckBox is not null)
+        {
+            bool has = Editor.GutterOptions.HasFlag(GutterOptions.Folding);
+            _foldIndicatorsCheckBox.Value = has ? CheckState.Checked : CheckState.UnChecked;
+        }
+        if (_wordWrapCheckBox is not null)
+            _wordWrapCheckBox.Value = Editor.WordWrap ? CheckState.Checked : CheckState.UnChecked;
+        if (_showTabsCheckBox is not null)
+            _showTabsCheckBox.Value = Editor.ShowTabs ? CheckState.Checked : CheckState.UnChecked;
+        if (_scrollbarsCheckBox is not null)
+        {
+            bool has = Editor.ViewportSettings.HasFlag(ViewportSettingsFlags.HasScrollBars);
+            _scrollbarsCheckBox.Value = has ? CheckState.Checked : CheckState.UnChecked;
+        }
+        if (_virtualSpaceCheckBox is not null)
+            _virtualSpaceCheckBox.Value = Editor.VirtualSpaceEnabled ? CheckState.Checked : CheckState.UnChecked;
+    }
+
     // ── Helpers ─────────────────────────────────────────────────────────────────────
 
     private static string ToggleTitle(bool on, string label)
         => on ? $"✓ {label}" : $"  {label}";
-
-    private void UpdateFileNameShortcut()
-    {
-        _fileNameShortcut.Title = CurrentFilePath ?? "<untitled>";
-        _fileNameShortcut.SetNeedsDraw();
-    }
 
     private void UpdateModifiedStatus()
     {
