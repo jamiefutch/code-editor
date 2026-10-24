@@ -161,6 +161,10 @@ The custom `VirtualSpaceEditor` subclass intercepts Right/Down key events to all
 | Microsoft.Extensions.Configuration / Json | 10.0.13 | JSON config loading |
 | Microsoft.Extensions.Logging | 10.0.7 | Logging abstraction |
 
+## Acknowledgements
+
+This project uses [Terminal.Gui](https://github.com/tui-cs/Terminal.Gui) as its cross-platform terminal GUI framework. Thank you to the Terminal.Gui contributors for building and maintaining this excellent TUI library.
+
 ## License
 
-[Add your license here]
+Licensed under the [MIT License](LICENSE).
